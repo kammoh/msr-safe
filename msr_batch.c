@@ -36,12 +36,12 @@
  * which may be used instead of or in addition to the lseek()/write()/read()
  * mechanism provided by msr_safe.c
  *
- * This driver uses /dev/cpu/msr_batch as its device file.
+ * This driver uses /dev/cpu/pulsar_batch as its device file.
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
-#include <asm/msr.h>
+// #include <asm/msr.h>
 #include <linux/cpu.h>
 #include <linux/device.h>
 #include <linux/fs.h>
@@ -91,70 +91,70 @@ static int msrbatch_close(struct inode *inode, struct file *file)
     return 0;
 }
 
-static int msrbatch_apply_whitelist(struct msr_batch_array *oa)
-{
-    struct msr_batch_op *op;
-    int err = 0;
-    bool has_sys_rawio_cap = capable(CAP_SYS_RAWIO);
+// static int msrbatch_apply_whitelist(struct pulsar_batch_array *oa)
+// {
+//     struct pulsar_batch_op *op;
+//     int err = 0;
+//     bool has_sys_rawio_cap = capable(CAP_SYS_RAWIO);
 
-    for (op = oa->ops; op < oa->ops + oa->numops; ++op)
-    {
-        op->err = 0;
+//     for (op = oa->ops; op < oa->ops + oa->numops; ++op)
+//     {
+//         op->err = 0;
 
-        if (op->cpu >= nr_cpu_ids || !cpu_online(op->cpu))
-        {
-            pr_debug("No such CPU %d\n", op->cpu);
-            op->err = err = -ENXIO; // No such CPU
-            continue;
-        }
+//         if (op->cpu >= nr_cpu_ids || !cpu_online(op->cpu))
+//         {
+//             pr_debug("No such CPU %d\n", op->cpu);
+//             op->err = err = -ENXIO; // No such CPU
+//             continue;
+//         }
 
-        if (has_sys_rawio_cap)
-        {
-            op->wmask = 0xffffffffffffffff;
-            continue;
-        }
+//         if (has_sys_rawio_cap)
+//         {
+//             op->wmask = 0xffffffffffffffff;
+//             continue;
+//         }
 
-        if (!msr_whitelist_maskexists(op->msr))
-        {
-            pr_debug("No whitelist entry for MSR %x\n", op->msr);
-            op->err = err = -EACCES;
-        }
-        else
-        {
-            op->wmask = msr_whitelist_writemask(op->msr);
-            /* Check for read-only case */
-            if (op->wmask == 0 && !op->isrdmsr)
-            {
-                pr_debug("MSR %x is read-only\n", op->msr);
-                op->err = err = -EACCES;
-            }
-        }
-    }
-    return err;
-}
+//         if (!msr_whitelist_maskexists(op->msr))
+//         {
+//             pr_debug("No whitelist entry for MSR %x\n", op->msr);
+//             op->err = err = -EACCES;
+//         }
+//         else
+//         {
+//             op->wmask = msr_whitelist_writemask(op->msr);
+//             /* Check for read-only case */
+//             if (op->wmask == 0 && !op->isrdmsr)
+//             {
+//                 pr_debug("MSR %x is read-only\n", op->msr);
+//                 op->err = err = -EACCES;
+//             }
+//         }
+//     }
+//     return err;
+// }
 
-extern int msr_safe_batch(struct msr_batch_array *oa);
+extern int msr_safe_batch(struct pulsar_batch_array *oa);
 
 static long msrbatch_ioctl(struct file *f, unsigned int ioc, unsigned long arg)
 {
     int err = 0;
-    struct msr_batch_array __user *uoa;
-    struct msr_batch_op __user *uops;
-    struct msr_batch_array koa;
+    struct pulsar_batch_array __user *uoa;
+    struct pulsar_batch_op __user *uops;
+    struct pulsar_batch_array koa;
 
-    if (ioc != X86_IOC_MSR_BATCH)
-    {
-        pr_debug("Invalid ioctl op %u\n", ioc);
-        return -ENOTTY;
-    }
+    // if (ioc != X86_IOC_pulsar_batch)
+    // {
+    //     pr_debug("Invalid ioctl op %u\n", ioc);
+    //     return -ENOTTY;
+    // }
 
-    if (!(f->f_mode & FMODE_READ))
-    {
-        pr_debug("File not open for reading\n");
-        return -EBADF;
-    }
+    // if (!(f->f_mode & FMODE_READ))
+    // {
+    //     pr_debug("File not open for reading\n");
+    //     return -EBADF;
+    // }
 
-    uoa = (struct msr_batch_array *)arg;
+    uoa = (struct pulsar_batch_array *)arg;
 
     if (copy_from_user(&koa, uoa, sizeof(koa)))
     {
@@ -162,11 +162,11 @@ static long msrbatch_ioctl(struct file *f, unsigned int ioc, unsigned long arg)
         return -EFAULT;
     }
 
-    if (koa.numops <= 0)
-    {
-        pr_debug("Invalid # of ops %d\n", koa.numops);
-        return -EINVAL;
-    }
+    // if (koa.numops <= 0)
+    // {
+    //     pr_debug("Invalid # of ops %d\n", koa.numops);
+    //     return -EINVAL;
+    // }
 
     uops = koa.ops;
 
@@ -183,19 +183,20 @@ static long msrbatch_ioctl(struct file *f, unsigned int ioc, unsigned long arg)
         goto bundle_alloc;
     }
 
-    err = msrbatch_apply_whitelist(&koa);
-    if (err)
-    {
-        pr_debug("Failed to apply whitelist %d\n", err);
-        goto copyout_and_return;
-    }
+    // err = msrbatch_apply_whitelist(&koa);
+    // if (err)
+    // {
+    //     pr_debug("Failed to apply whitelist %d\n", err);
+    //     goto copyout_and_return;
+    // }
 
-    err = msr_safe_batch(&koa);
-    if (err != 0)
-    {
-        pr_debug("msr_safe_batch failed: %d\n", err);
-        goto copyout_and_return;
-    }
+    // err = 
+    msr_safe_batch(&koa);
+    // if (err != 0)
+    // {
+    //     pr_debug("msr_safe_batch failed: %d\n", err);
+    //     goto copyout_and_return;
+    // }
 
 copyout_and_return:
     if (copy_to_user(uops, koa.ops, koa.numops * sizeof(*uops)))
@@ -238,7 +239,7 @@ void msrbatch_cleanup(void)
     if (cdev_registered)
     {
         cdev_registered = 0;
-        unregister_chrdev(majordev, "cpu/msr_batch");
+        unregister_chrdev(majordev, "cpu/pulsar_batch");
     }
 }
 
@@ -248,7 +249,7 @@ static char *msrbatch_nodename(struct device *dev, mode_t *mode)
 static char *msrbatch_nodename(struct device *dev, umode_t *mode)
 #endif
 {
-    return kasprintf(GFP_KERNEL, "cpu/msr_batch");
+    return kasprintf(GFP_KERNEL, "cpu/pulsar_batch");
 }
 
 int msrbatch_init(void)
@@ -256,7 +257,7 @@ int msrbatch_init(void)
     int err;
     struct device *dev;
 
-    majordev = register_chrdev(0, "cpu/msr_batch", &fops);
+    majordev = register_chrdev(0, "cpu/pulsar_batch", &fops);
     if (majordev < 0)
     {
         pr_debug("msrbatch_init: unable to register chrdev\n");
@@ -265,7 +266,7 @@ int msrbatch_init(void)
     }
     cdev_registered = 1;
 
-    cdev_class = class_create(THIS_MODULE, "msr_batch");
+    cdev_class = class_create(THIS_MODULE, "pulsar_batch");
     if (IS_ERR(cdev_class))
     {
         err = PTR_ERR(cdev_class);
@@ -276,7 +277,7 @@ int msrbatch_init(void)
 
     cdev_class->devnode = msrbatch_nodename;
 
-    dev = device_create(cdev_class, NULL, MKDEV(majordev, 0), NULL, "msr_batch");
+    dev = device_create(cdev_class, NULL, MKDEV(majordev, 0), NULL, "pulsar_batch");
     if (IS_ERR(dev))
     {
         err = PTR_ERR(dev);

@@ -1,8 +1,10 @@
 %global rev         %(git rev-parse HEAD)
 %global shortrev    %(r=%{rev}; echo ${r:0:12})
+%global kern_ver    %(uname -r)
+%global kern_build  /lib/modules/%{kern_ver}/build/
 
 Name:       msr-safe
-Version:    0
+Version:    0.1
 Release:    0.4.git%{shortrev}%{?dist}
 License:    GPLv3+
 Summary:    Allows safer access to model specific registers (MSRs)
@@ -17,7 +19,7 @@ BuildRoot:  %{_tmppath}/%{name}-%{version}-build
 BuildRequires:  %kernel_module_package_buildreqs
 BuildRequires:  systemd
 
-%kernel_module_package default
+%kernel_module_package
 
 %description
 Allows safer access to model specific registers (MSRs)
@@ -30,7 +32,7 @@ for flavor in %flavors_to_build; do
     rm -rf obj/$flavor
     mkdir -p obj/$flavor
     cp -r msr* Makefile obj/$flavor
-    %{__make} -C %{kernel_source $flavor} M=$PWD/obj/$flavor
+    %{__make} -C %{kern_build} M=$PWD/obj/$flavor
 done
 %{__make} CPPFLAGS="-DVERSION=\\\"%{version}-%{release}\\\"" msrsave/msrsave
 
@@ -50,7 +52,7 @@ install -m 0755 %{SOURCE4} %{buildroot}%{_sbindir}/msr-safe
 export INSTALL_MOD_PATH=$RPM_BUILD_ROOT
 export INSTALL_MOD_DIR=extra/%{name}
 for flavor in %flavors_to_build ; do
-        make -C %{kernel_source $flavor} modules_install \
+        make -C %{kern_build} modules_install \
                 M=$PWD/obj/$flavor
 done
 
@@ -63,7 +65,7 @@ exit 0
 
 %post
 /usr/bin/udevadm control --reload-rules
-echo /lib/modules/%{latest_kernel}/extra/msr-safe/msr-safe.ko | weak-modules --add-modules
+echo /lib/modules/%{kern_ver}/extra/msr-safe/msr-safe.ko | weak-modules --add-modules
 /usr/bin/systemctl daemon-reload >/dev/null 2>&1
 /usr/bin/systemctl enable msr-safe >/dev/null 2>&1 || :
 
@@ -72,7 +74,7 @@ if [ $1 -eq 0 ] ; then
     /usr/bin/systemctl stop msr-safe >/dev/null 2>&1
     /usr/bin/systemctl disable msr-safe >/dev/null 2>&1
 fi
-echo /lib/modules/%{latest_kernel}/extra/msr-safe/msr-safe.ko | weak-modules --remove-modules
+echo /lib/modules/%{kern_ver}/extra/msr-safe/msr-safe.ko | weak-modules --remove-modules
 
 %postun
 if [ "$1" -ge "1" ] ; then

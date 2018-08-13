@@ -44,10 +44,12 @@
 
 #include "msr_safe.h"
 
+const __u64 wmask = 0x00000000ffffffff;
+
 static void __msr_safe_batch(void *info)
 {
-    struct msr_batch_array *oa = info;
-    struct msr_batch_op *op;
+    struct pulsar_batch_array *oa = info;
+    struct pulsar_batch_op *op;
     int this_cpu = smp_processor_id();
     u32 *dp;
     u64 oldmsr;
@@ -73,8 +75,8 @@ static void __msr_safe_batch(void *info)
             continue;
         }
 
-        newmsr = op->msrdata & op->wmask;
-        newmsr |= (oldmsr & ~op->wmask);
+        newmsr = op->msrdata & wmask;
+        newmsr |= (oldmsr & ~wmask);
         dp = (u32 *)&newmsr;
         if (wrmsr_safe(op->msr, dp[0], dp[1]))
         {
@@ -83,10 +85,10 @@ static void __msr_safe_batch(void *info)
     }
 }
 
-int msr_safe_batch(struct msr_batch_array *oa)
+int msr_safe_batch(struct pulsar_batch_array *oa)
 {
     struct cpumask cpus_to_run_on;
-    struct msr_batch_op *op;
+    struct pulsar_batch_op *op;
 
     cpumask_clear(&cpus_to_run_on);
     for (op = oa->ops; op < oa->ops + oa->numops; ++op)

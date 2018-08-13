@@ -96,12 +96,12 @@ static ssize_t msr_read(struct file *file, char __user *buf, size_t count, loff_
     {
         return -EINVAL; /* Invalid chunk size */
     }
-
+#if 0
     if (!capable(CAP_SYS_RAWIO) && !msr_whitelist_maskexists(reg))
     {
         return -EACCES;
     }
-
+#endif
     for (; count; count -= 8)
     {
         err = rdmsr_safe_on_cpu(cpu, reg, &data[0], &data[1]);
@@ -137,13 +137,14 @@ static ssize_t msr_write(struct file *file, const char __user *buf, size_t count
         return -EINVAL; // Invalid chunk size
     }
 
+#if 0    
     mask = capable(CAP_SYS_RAWIO) ? 0xffffffffffffffff : msr_whitelist_writemask(reg);
 
     if (!capable(CAP_SYS_RAWIO) && mask == 0)
     {
         return -EACCES;
     }
-
+#endif
     for (; count; count -= 8)
     {
         if (copy_from_user(&data, tmp, 8))
@@ -151,7 +152,7 @@ static ssize_t msr_write(struct file *file, const char __user *buf, size_t count
             err = -EFAULT;
             break;
         }
-
+#if 0
         if (mask != 0xffffffffffffffff)
         {
             err = rdmsr_safe_on_cpu(cpu, reg, &curdata[0], &curdata[1]);
@@ -164,7 +165,7 @@ static ssize_t msr_write(struct file *file, const char __user *buf, size_t count
             *(u64 *)&data[0] &= mask;
             *(u64 *)&data[0] |= *(u64 *)&curdata[0];
         }
-
+#endif
         err = wrmsr_safe_on_cpu(cpu, reg, data[0], data[1]);
         if (err)
         {
@@ -183,12 +184,12 @@ static long msr_ioctl(struct file *file, unsigned int ioc, unsigned long arg)
     u32 regs[8];
     int cpu = iminor(file->f_path.dentry->d_inode);
     int err;
-
+#if 0
     if (!capable(CAP_SYS_RAWIO))
     {
         return -EACCES;
     }
-
+#endif
     switch (ioc)
     {
         case X86_IOC_RDMSR_REGS:
@@ -286,7 +287,7 @@ static int msr_device_create(unsigned int cpu)
 {
     struct device *dev;
 
-    dev = device_create(msr_class, NULL, MKDEV(majordev, cpu), NULL, "msr_safe%d", cpu);
+    dev = device_create(msr_class, NULL, MKDEV(majordev, cpu), NULL, "pulsar_msr%d", cpu);
     return IS_ERR(dev) ? PTR_ERR(dev) : 0;
 }
 
@@ -335,7 +336,46 @@ static char *msr_devnode(struct device *dev, mode_t *mode)
 static char *msr_devnode(struct device *dev, umode_t *mode)
 #endif
 {
-    return kasprintf(GFP_KERNEL, "cpu/%u/msr_safe", MINOR(dev->devt));
+    return kasprintf(GFP_KERNEL, "cpu/%u/pulsar_msr", MINOR(dev->devt));
+}
+
+static void printc4(void) {
+    typedef long unsigned int uint64_t;
+    uint64_t output;
+    // Read back CR4 to check the bit.
+    __asm__("\t mov %%cr4,%0" : "=r"(output));
+    printk(KERN_INFO "%lu", output);
+}
+
+static void setc4b8(void * info) {
+    // Set CR4, Bit 8 (9th bit from the right)  to enable
+__asm__("push   %rax\n\t"
+                "mov    %cr4,%rax;\n\t"
+                "or     $(1 << 8),%rax;\n\t"
+                "mov    %rax,%cr4;\n\t"
+                "wbinvd\n\t"
+                "pop    %rax"
+    );
+
+    // Check which CPU we are on:
+    printk(KERN_INFO "Ran on Processor %d", smp_processor_id());
+    printc4();
+}
+
+static void clearc4b8(void * info) {
+    printc4();
+__asm__("push   %rax\n\t"
+        "push   %rbx\n\t"
+                "mov    %cr4,%rax;\n\t"
+                "mov  $(1 << 8), %rbx\n\t"
+                "not  %rbx\n\t"
+                "and   %rbx, %rax;\n\t"
+                "mov    %rax,%cr4;\n\t"
+                "wbinvd\n\t"
+                "pop    %rbx\n\t"
+                "pop    %rax\n\t"
+    );
+    printk(KERN_INFO "Ran on Processor %d", smp_processor_id());
 }
 
 static int __init msr_init(void)
@@ -344,6 +384,7 @@ static int __init msr_init(void)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4,10,0)
     int i;
 #endif
+    on_each_cpu(setc4b8, NULL, 0);
 
     err = msrbatch_init();
     if (err != 0)
@@ -351,20 +392,24 @@ static int __init msr_init(void)
         pr_debug("failed to initialize msrbatch\n");
         goto out;
     }
+
+#if 0
     err = msr_whitelist_init();
     if (err != 0)
     {
         pr_debug("failed to initialize whitelist for msr\n");
         goto out_batch;
     }
-    majordev = __register_chrdev(0, 0, num_possible_cpus(), "cpu/msr_safe", &msr_fops);
+#endif
+
+    majordev = __register_chrdev(0, 0, num_possible_cpus(), "cpu/pulsar_msr", &msr_fops);
     if (majordev < 0)
     {
-        pr_debug("unable to get major %d for msr_safe\n", majordev);
+        pr_debug("unable to get major %d for pulsar_msr\n", majordev);
         err = -EBUSY;
         goto out_wlist;
     }
-    msr_class = class_create(THIS_MODULE, "msr_safe");
+    msr_class = class_create(THIS_MODULE, "pulsar_msr");
     if (IS_ERR(msr_class))
     {
         err = PTR_ERR(msr_class);
@@ -399,9 +444,11 @@ out_class:
 #endif
     class_destroy(msr_class);
 out_chrdev:
-    __unregister_chrdev(majordev, 0, num_possible_cpus(), "cpu/msr_safe");
+    __unregister_chrdev(majordev, 0, num_possible_cpus(), "cpu/pulsar_msr");
 out_wlist:
+#if 0
     msr_whitelist_cleanup();
+#endif
 out_batch:
     msrbatch_cleanup();
 out:
@@ -420,19 +467,22 @@ static void __exit msr_exit(void)
     cpuhp_remove_state(cpuhp_msr_state);
 #endif
     class_destroy(msr_class);
-    __unregister_chrdev(majordev, 0, num_possible_cpus(), "cpu/msr_safe");
+    __unregister_chrdev(majordev, 0, num_possible_cpus(), "cpu/pulsar_msr");
+
+    on_each_cpu(clearc4b8, NULL, 0);
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4,10,0)
     unregister_hotcpu_notifier(&msr_class_cpu_notifier);
 #endif
-
+#if 0
     msr_whitelist_cleanup();
+#endif
     msrbatch_cleanup();
 }
 
 module_exit(msr_exit)
 
-MODULE_AUTHOR("H. Peter Anvin <hpa@zytor.com>");
-MODULE_DESCRIPTION("x86 generic MSR driver (+LLNL Whitelist)");
+MODULE_AUTHOR("H. Peter Anvin <hpa@zytor.com>, modified for Pulsar by Kamyar<kammoh@gmail.com>");
+MODULE_DESCRIPTION("x86 generic MSR driver -- Modified for Pulsar-- ");
 MODULE_VERSION("1.2");
 MODULE_LICENSE("GPL");
