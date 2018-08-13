@@ -36,7 +36,7 @@
  * which may be used instead of or in addition to the lseek()/write()/read()
  * mechanism provided by msr_safe.c
  *
- * This driver uses /dev/cpu/pulsar_batch as its device file.
+ * This driver uses /dev/cpu/msr_batch as its device file.
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -91,9 +91,9 @@ static int msrbatch_close(struct inode *inode, struct file *file)
     return 0;
 }
 
-// static int msrbatch_apply_whitelist(struct pulsar_batch_array *oa)
+// static int msrbatch_apply_whitelist(struct msr_batch_array *oa)
 // {
-//     struct pulsar_batch_op *op;
+//     struct msr_batch_op *op;
 //     int err = 0;
 //     bool has_sys_rawio_cap = capable(CAP_SYS_RAWIO);
 
@@ -133,16 +133,16 @@ static int msrbatch_close(struct inode *inode, struct file *file)
 //     return err;
 // }
 
-extern int msr_safe_batch(struct pulsar_batch_array *oa);
+extern int msr_safe_batch(struct msr_batch_array *oa);
 
 static long msrbatch_ioctl(struct file *f, unsigned int ioc, unsigned long arg)
 {
     int err = 0;
-    struct pulsar_batch_array __user *uoa;
-    struct pulsar_batch_op __user *uops;
-    struct pulsar_batch_array koa;
+    struct msr_batch_array __user *uoa;
+    struct msr_batch_op __user *uops;
+    struct msr_batch_array koa;
 
-    // if (ioc != X86_IOC_pulsar_batch)
+    // if (ioc != X86_IOC_MSR_BATCH)
     // {
     //     pr_debug("Invalid ioctl op %u\n", ioc);
     //     return -ENOTTY;
@@ -154,7 +154,7 @@ static long msrbatch_ioctl(struct file *f, unsigned int ioc, unsigned long arg)
     //     return -EBADF;
     // }
 
-    uoa = (struct pulsar_batch_array *)arg;
+    uoa = (struct msr_batch_array *)arg;
 
     if (copy_from_user(&koa, uoa, sizeof(koa)))
     {
@@ -239,7 +239,7 @@ void msrbatch_cleanup(void)
     if (cdev_registered)
     {
         cdev_registered = 0;
-        unregister_chrdev(majordev, "cpu/pulsar_batch");
+        unregister_chrdev(majordev, "cpu/msr_batch");
     }
 }
 
@@ -249,7 +249,7 @@ static char *msrbatch_nodename(struct device *dev, mode_t *mode)
 static char *msrbatch_nodename(struct device *dev, umode_t *mode)
 #endif
 {
-    return kasprintf(GFP_KERNEL, "cpu/pulsar_batch");
+    return kasprintf(GFP_KERNEL, "cpu/msr_batch");
 }
 
 int msrbatch_init(void)
@@ -257,7 +257,7 @@ int msrbatch_init(void)
     int err;
     struct device *dev;
 
-    majordev = register_chrdev(0, "cpu/pulsar_batch", &fops);
+    majordev = register_chrdev(0, "cpu/msr_batch", &fops);
     if (majordev < 0)
     {
         pr_debug("msrbatch_init: unable to register chrdev\n");
@@ -266,7 +266,7 @@ int msrbatch_init(void)
     }
     cdev_registered = 1;
 
-    cdev_class = class_create(THIS_MODULE, "pulsar_batch");
+    cdev_class = class_create(THIS_MODULE, "msr_batch");
     if (IS_ERR(cdev_class))
     {
         err = PTR_ERR(cdev_class);
@@ -277,7 +277,7 @@ int msrbatch_init(void)
 
     cdev_class->devnode = msrbatch_nodename;
 
-    dev = device_create(cdev_class, NULL, MKDEV(majordev, 0), NULL, "pulsar_batch");
+    dev = device_create(cdev_class, NULL, MKDEV(majordev, 0), NULL, "msr_batch");
     if (IS_ERR(dev))
     {
         err = PTR_ERR(dev);

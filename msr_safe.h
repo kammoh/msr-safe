@@ -43,7 +43,7 @@
 #include <linux/ioctl.h>
 #include <linux/types.h>
 
-struct pulsar_batch_op
+struct msr_batch_op
 {
     __u8 cpu;     // In: CPU to execute {rd/wr}msr instruction
     __u8 isrdmsr; // In: 0=wrmsr, non-zero=rdmsr
@@ -53,13 +53,13 @@ struct pulsar_batch_op
     // __u64 wmask;   // Out: Write mask applied to wrmsr
 };
 
-struct pulsar_batch_array
+struct msr_batch_array
 {
     __u32 numops;             // In: # of operations in operations array
-    struct pulsar_batch_op *ops; // In: Array[numops] of operations
+    struct msr_batch_op *ops; // In: Array[numops] of operations
 };
 
-#define X86_IOC_MSR_BATCH   _IOWR('c', 0xA2, struct pulsar_batch_array)
-// #define X86_IOC_MSR_BATCH_PCM_UNCORE   _IOWR('c', 0xA3, struct pulsar_batch_array)
+#define X86_IOC_MSR_BATCH   _IOWR('c', 0xA2, struct msr_batch_array)
+// #define X86_IOC_MSR_BATCH_PCM_UNCORE   _IOWR('c', 0xA3, struct msr_batch_array)
 
 #endif
