@@ -91,47 +91,47 @@ static int msrbatch_close(struct inode *inode, struct file *file)
     return 0;
 }
 
-// static int msrbatch_apply_whitelist(struct msr_batch_array *oa)
-// {
-//     struct msr_batch_op *op;
-//     int err = 0;
-//     bool has_sys_rawio_cap = capable(CAP_SYS_RAWIO);
+static int msrbatch_apply_whitelist(struct msr_batch_array *oa)
+{
+    struct msr_batch_op *op;
+    int err = 0;
+    bool has_sys_rawio_cap = capable(CAP_SYS_RAWIO);
 
-//     for (op = oa->ops; op < oa->ops + oa->numops; ++op)
-//     {
-//         op->err = 0;
+    for (op = oa->ops; op < oa->ops + oa->numops; ++op)
+    {
+        op->err = 0;
 
-//         if (op->cpu >= nr_cpu_ids || !cpu_online(op->cpu))
-//         {
-//             pr_debug("No such CPU %d\n", op->cpu);
-//             op->err = err = -ENXIO; // No such CPU
-//             continue;
-//         }
+        if (op->cpu >= nr_cpu_ids || !cpu_online(op->cpu))
+        {
+            pr_debug("No such CPU %d\n", op->cpu);
+            op->err = err = -ENXIO; // No such CPU
+            continue;
+        }
 
-//         if (has_sys_rawio_cap)
-//         {
-//             op->wmask = 0xffffffffffffffff;
-//             continue;
-//         }
+        if (has_sys_rawio_cap)
+        {
+            op->wmask = 0xffffffffffffffff;
+            continue;
+        }
 
-//         if (!msr_whitelist_maskexists(op->msr))
-//         {
-//             pr_debug("No whitelist entry for MSR %x\n", op->msr);
-//             op->err = err = -EACCES;
-//         }
-//         else
-//         {
-//             op->wmask = msr_whitelist_writemask(op->msr);
-//             /* Check for read-only case */
-//             if (op->wmask == 0 && !op->isrdmsr)
-//             {
-//                 pr_debug("MSR %x is read-only\n", op->msr);
-//                 op->err = err = -EACCES;
-//             }
-//         }
-//     }
-//     return err;
-// }
+        if (!msr_whitelist_maskexists(op->msr))
+        {
+            pr_debug("No whitelist entry for MSR %x\n", op->msr);
+            op->err = err = -EACCES;
+        }
+        else
+        {
+            op->wmask = msr_whitelist_writemask(op->msr);
+            /* Check for read-only case */
+            if (op->wmask == 0 && !op->isrdmsr)
+            {
+                pr_debug("MSR %x is read-only\n", op->msr);
+                op->err = err = -EACCES;
+            }
+        }
+    }
+    return err;
+}
 
 extern int msr_safe_batch(struct msr_batch_array *oa);
 
@@ -142,17 +142,17 @@ static long msrbatch_ioctl(struct file *f, unsigned int ioc, unsigned long arg)
     struct msr_batch_op __user *uops;
     struct msr_batch_array koa;
 
-    // if (ioc != X86_IOC_MSR_BATCH)
-    // {
-    //     pr_debug("Invalid ioctl op %u\n", ioc);
-    //     return -ENOTTY;
-    // }
+    if (ioc != X86_IOC_MSR_BATCH)
+    {
+        pr_debug("Invalid ioctl op %u\n", ioc);
+        return -ENOTTY;
+    }
 
-    // if (!(f->f_mode & FMODE_READ))
-    // {
-    //     pr_debug("File not open for reading\n");
-    //     return -EBADF;
-    // }
+    if (!(f->f_mode & FMODE_READ))
+    {
+        pr_debug("File not open for reading\n");
+        return -EBADF;
+    }
 
     uoa = (struct msr_batch_array *)arg;
 
@@ -162,11 +162,11 @@ static long msrbatch_ioctl(struct file *f, unsigned int ioc, unsigned long arg)
         return -EFAULT;
     }
 
-    // if (koa.numops <= 0)
-    // {
-    //     pr_debug("Invalid # of ops %d\n", koa.numops);
-    //     return -EINVAL;
-    // }
+    if (koa.numops <= 0)
+    {
+        pr_debug("Invalid # of ops %d\n", koa.numops);
+        return -EINVAL;
+    }
 
     uops = koa.ops;
 
@@ -183,20 +183,19 @@ static long msrbatch_ioctl(struct file *f, unsigned int ioc, unsigned long arg)
         goto bundle_alloc;
     }
 
-    // err = msrbatch_apply_whitelist(&koa);
-    // if (err)
-    // {
-    //     pr_debug("Failed to apply whitelist %d\n", err);
-    //     goto copyout_and_return;
-    // }
+    err = msrbatch_apply_whitelist(&koa);
+    if (err)
+    {
+        pr_debug("Failed to apply whitelist %d\n", err);
+        goto copyout_and_return;
+    }
 
-    // err = 
-    msr_safe_batch(&koa);
-    // if (err != 0)
-    // {
-    //     pr_debug("msr_safe_batch failed: %d\n", err);
-    //     goto copyout_and_return;
-    // }
+    err = msr_safe_batch(&koa);
+    if (err != 0)
+    {
+        pr_debug("msr_safe_batch failed: %d\n", err);
+        goto copyout_and_return;
+    }
 
 copyout_and_return:
     if (copy_to_user(uops, koa.ops, koa.numops * sizeof(*uops)))

@@ -96,12 +96,12 @@ static ssize_t msr_read(struct file *file, char __user *buf, size_t count, loff_
     {
         return -EINVAL; /* Invalid chunk size */
     }
-#if 0
+
     if (!capable(CAP_SYS_RAWIO) && !msr_whitelist_maskexists(reg))
     {
         return -EACCES;
     }
-#endif
+
     for (; count; count -= 8)
     {
         err = rdmsr_safe_on_cpu(cpu, reg, &data[0], &data[1]);
@@ -136,15 +136,14 @@ static ssize_t msr_write(struct file *file, const char __user *buf, size_t count
     {
         return -EINVAL; // Invalid chunk size
     }
-
-#if 0    
-    mask = capable(CAP_SYS_RAWIO) ? 0xffffffffffffffff : msr_whitelist_writemask(reg);
+   
+    mask = /*capable(CAP_SYS_RAWIO) ? 0xffffffffffffffff :*/ msr_whitelist_writemask(reg);
 
     if (!capable(CAP_SYS_RAWIO) && mask == 0)
     {
         return -EACCES;
     }
-#endif
+
     for (; count; count -= 8)
     {
         if (copy_from_user(&data, tmp, 8))
@@ -152,7 +151,7 @@ static ssize_t msr_write(struct file *file, const char __user *buf, size_t count
             err = -EFAULT;
             break;
         }
-#if 0
+
         if (mask != 0xffffffffffffffff)
         {
             err = rdmsr_safe_on_cpu(cpu, reg, &curdata[0], &curdata[1]);
@@ -165,7 +164,7 @@ static ssize_t msr_write(struct file *file, const char __user *buf, size_t count
             *(u64 *)&data[0] &= mask;
             *(u64 *)&data[0] |= *(u64 *)&curdata[0];
         }
-#endif
+
         err = wrmsr_safe_on_cpu(cpu, reg, data[0], data[1]);
         if (err)
         {
@@ -393,14 +392,13 @@ static int __init msr_init(void)
         goto out;
     }
 
-#if 0
     err = msr_whitelist_init();
     if (err != 0)
     {
         pr_debug("failed to initialize whitelist for msr\n");
         goto out_batch;
     }
-#endif
+
 
     majordev = __register_chrdev(0, 0, num_possible_cpus(), "cpu/pulsar_msr", &msr_fops);
     if (majordev < 0)
@@ -446,9 +444,8 @@ out_class:
 out_chrdev:
     __unregister_chrdev(majordev, 0, num_possible_cpus(), "cpu/pulsar_msr");
 out_wlist:
-#if 0
     msr_whitelist_cleanup();
-#endif
+
 out_batch:
     msrbatch_cleanup();
 out:
@@ -474,9 +471,7 @@ static void __exit msr_exit(void)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4,10,0)
     unregister_hotcpu_notifier(&msr_class_cpu_notifier);
 #endif
-#if 0
     msr_whitelist_cleanup();
-#endif
     msrbatch_cleanup();
 }
 
