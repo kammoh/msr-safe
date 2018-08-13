@@ -286,7 +286,7 @@ static int msr_device_create(unsigned int cpu)
 {
     struct device *dev;
 
-    dev = device_create(msr_class, NULL, MKDEV(majordev, cpu), NULL, "pulsar_msr%d", cpu);
+    dev = device_create(msr_class, NULL, MKDEV(majordev, cpu), NULL, "msr_safe%d", cpu);
     return IS_ERR(dev) ? PTR_ERR(dev) : 0;
 }
 
@@ -335,7 +335,7 @@ static char *msr_devnode(struct device *dev, mode_t *mode)
 static char *msr_devnode(struct device *dev, umode_t *mode)
 #endif
 {
-    return kasprintf(GFP_KERNEL, "cpu/%u/pulsar_msr", MINOR(dev->devt));
+    return kasprintf(GFP_KERNEL, "cpu/%u/msr_safe", MINOR(dev->devt));
 }
 
 static void printc4(void) {
@@ -400,14 +400,14 @@ static int __init msr_init(void)
     }
 
 
-    majordev = __register_chrdev(0, 0, num_possible_cpus(), "cpu/pulsar_msr", &msr_fops);
+    majordev = __register_chrdev(0, 0, num_possible_cpus(), "cpu/msr_safe", &msr_fops);
     if (majordev < 0)
     {
-        pr_debug("unable to get major %d for pulsar_msr\n", majordev);
+        pr_debug("unable to get major %d for msr_safe\n", majordev);
         err = -EBUSY;
         goto out_wlist;
     }
-    msr_class = class_create(THIS_MODULE, "pulsar_msr");
+    msr_class = class_create(THIS_MODULE, "msr_safe");
     if (IS_ERR(msr_class))
     {
         err = PTR_ERR(msr_class);
@@ -442,7 +442,7 @@ out_class:
 #endif
     class_destroy(msr_class);
 out_chrdev:
-    __unregister_chrdev(majordev, 0, num_possible_cpus(), "cpu/pulsar_msr");
+    __unregister_chrdev(majordev, 0, num_possible_cpus(), "cpu/msr_safe");
 out_wlist:
     msr_whitelist_cleanup();
 

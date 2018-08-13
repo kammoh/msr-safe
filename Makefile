@@ -35,8 +35,8 @@
 #CFLAGS_msr_batch.o := -DDEBUG
 #CFLAGS_msr-smp.o := -DDEBUG
 
-obj-m += msr-pulsar.o
-msr-pulsar-objs := msr_entry.o msr_whitelist.o msr-smp.o msr_batch.o
+obj-m += msr-safe.o
+msr-safe-objs := msr_entry.o msr_whitelist.o msr-smp.o msr_batch.o
 
 all: msrsave/msrsave
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
